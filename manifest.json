@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "OpenEvidence Shortcuts",
-  "version": "0.1.4",
+  "version": "0.1.5",
   "description": "Append saved Markdown prompts into OpenEvidence inputs from a searchable right-click picker.",
   "permissions": ["contextMenus", "storage", "clipboardWrite"],
   "host_permissions": ["https://www.openevidence.com/*"],
@@ -23,8 +23,8 @@
   "commands": {
     "open-prompt-picker": {
       "suggested_key": {
-        "default": "Alt+Shift+P",
-        "mac": "Alt+Shift+P"
+        "default": "Alt+Shift+O",
+        "mac": "Alt+Shift+O"
       },
       "description": "Open the OpenEvidence prompt picker"
     }

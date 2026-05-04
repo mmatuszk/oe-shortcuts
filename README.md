@@ -8,7 +8,7 @@ Chrome Manifest V3 extension for appending saved Markdown prompts into the curre
 2. Enable Developer mode.
 3. Click **Load unpacked**.
 4. Select this repo folder.
-5. Open `https://www.openevidence.com/`, focus a text control, then right-click and choose **OpenEvidence Prompts** or press `Alt+Shift+P`.
+5. Open `https://www.openevidence.com/`, focus a text control, then right-click and choose **OpenEvidence Prompts** or press `Alt+Shift+O`.
 
 Chrome lets you change the shortcut at `chrome://extensions/shortcuts`.
 
