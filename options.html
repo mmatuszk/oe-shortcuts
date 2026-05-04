@@ -1,0 +1,106 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>OpenEvidence Shortcuts</title>
+    <link rel="stylesheet" href="options.css">
+  </head>
+  <body>
+    <main class="app-shell">
+      <section class="toolbar">
+        <div>
+          <h1>OpenEvidence Shortcuts</h1>
+          <p class="muted">Manage raw Markdown prompts stored in Chrome local storage.</p>
+        </div>
+        <div class="toolbar-actions">
+          <button id="newPromptButton" type="button">New Prompt</button>
+          <button id="exportJsonButton" type="button">Export JSON</button>
+          <label class="file-button">
+            Import JSON
+            <input id="importJsonInput" type="file" accept=".json,application/json">
+          </label>
+          <label class="file-button">
+            Import MD
+            <input id="importMarkdownInput" type="file" accept=".md,.markdown,text/markdown,text/plain" multiple>
+          </label>
+        </div>
+      </section>
+
+      <section class="layout">
+        <aside class="prompt-list-panel">
+          <input id="promptSearch" class="search" type="search" placeholder="Search prompts">
+          <div id="promptList" class="prompt-list"></div>
+        </aside>
+
+        <section class="editor-panel">
+          <form id="promptForm" class="editor-form">
+            <input id="promptId" type="hidden">
+            <label>
+              Title
+              <input id="promptTitle" type="text" required>
+            </label>
+            <label>
+              Tags
+              <input id="promptTags" type="text" placeholder="summary, diagnosis">
+            </label>
+            <label class="body-field">
+              Markdown Prompt
+              <textarea id="promptBody" required spellcheck="true"></textarea>
+            </label>
+            <div class="form-actions">
+              <div class="save-action">
+                <button id="savePromptButton" type="submit">Save Prompt</button>
+                <span id="saveStatus" class="save-status" role="status" aria-live="polite"></span>
+              </div>
+              <button id="deletePromptButton" class="danger" type="button">Delete</button>
+            </div>
+          </form>
+
+          <section class="helper-panel">
+            <div class="helper-header">
+              <h2>Import JSON Generator Prompt</h2>
+              <button id="copyHelperPromptButton" type="button">Copy</button>
+            </div>
+            <textarea id="helperPrompt" readonly></textarea>
+          </section>
+
+          <section class="log-panel">
+            <div class="helper-header">
+              <h2>Diagnostics</h2>
+              <div class="log-actions">
+                <button id="refreshLogsButton" type="button">Refresh</button>
+                <button id="exportDevLogButton" type="button">Export Dev</button>
+                <button id="exportErrorLogButton" type="button">Export Errors</button>
+                <button id="clearLogsButton" class="danger" type="button">Clear Logs</button>
+              </div>
+            </div>
+            <div class="log-toggles">
+              <label class="toggle-label">
+                <input id="devLogToggle" type="checkbox">
+                Dev log on
+              </label>
+              <label class="toggle-label">
+                <input id="errorLogToggle" type="checkbox">
+                Error log on
+              </label>
+            </div>
+            <div class="log-grid">
+              <label>
+                Dev Log
+                <textarea id="devLogOutput" readonly></textarea>
+              </label>
+              <label>
+                Error Log
+                <textarea id="errorLogOutput" readonly></textarea>
+              </label>
+            </div>
+          </section>
+        </section>
+      </section>
+    </main>
+
+    <script src="storage.js"></script>
+    <script src="options.js"></script>
+  </body>
+</html>
