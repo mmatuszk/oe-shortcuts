@@ -383,6 +383,320 @@
     }, 2400);
   }
 
+  function ensureEpicCopyStyles() {
+    if (document.getElementById("oe-shortcuts-epic-copy-styles")) {
+      return;
+    }
+
+    const style = document.createElement("style");
+    style.id = "oe-shortcuts-epic-copy-styles";
+    style.textContent = `
+      .oe-shortcuts-epic-copy {
+        align-items: center;
+        border: 1px solid #b8c4cc;
+        border-radius: 6px;
+        background: #ffffff;
+        color: #1f2933;
+        cursor: pointer;
+        display: inline-flex;
+        font: 600 12px/16px Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        gap: 6px;
+        height: 32px;
+        letter-spacing: 0;
+        margin-left: 4px;
+        padding: 0 10px;
+        white-space: nowrap;
+      }
+
+      .oe-shortcuts-epic-copy:hover {
+        background: #edf7f6;
+        border-color: #8db8b3;
+      }
+
+      .oe-shortcuts-epic-copy:focus-visible {
+        outline: 2px solid rgba(15, 118, 110, 0.35);
+        outline-offset: 2px;
+      }
+    `;
+    document.documentElement.appendChild(style);
+  }
+
+  function enhanceEpicCopyButtons() {
+    ensureEpicCopyStyles();
+    const copyButtons = Array.from(document.querySelectorAll("button[aria-label='Copy to clipboard']"));
+
+    copyButtons.forEach((copyButton) => {
+      const section = copyButton.closest("section");
+      const toolbar = copyButton.parentElement;
+
+      if (!section || !toolbar || !section.querySelector("h2") || toolbar.querySelector(".oe-shortcuts-epic-copy")) {
+        return;
+      }
+
+      const epicButton = document.createElement("button");
+      epicButton.type = "button";
+      epicButton.className = "oe-shortcuts-epic-copy hide-on-print";
+      epicButton.textContent = "Copy for Epic";
+      epicButton.setAttribute("aria-label", "Copy for Epic");
+      epicButton.addEventListener("click", (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        copySectionForEpic(section);
+      });
+
+      copyButton.insertAdjacentElement("afterend", epicButton);
+    });
+  }
+
+  function findEpicBodyRoot(section) {
+    const title = section.querySelector("h2");
+    const titleContainer = title && title.parentElement;
+    const candidates = Array.from(section.children)
+      .filter((child) => child !== titleContainer && !child.contains(titleContainer))
+      .filter((child) => child.querySelector("p,ul,ol,table"));
+
+    let body = candidates[0] || section;
+    while (body.children.length === 1 && body.firstElementChild.querySelector("p,ul,ol,table")) {
+      body = body.firstElementChild;
+    }
+
+    return body;
+  }
+
+  async function copySectionForEpic(section) {
+    try {
+      const html = buildEpicHtml(section);
+      const plainText = buildEpicPlainText(section);
+
+      if (window.ClipboardItem && navigator.clipboard && navigator.clipboard.write) {
+        await navigator.clipboard.write([
+          new ClipboardItem({
+            "text/html": new Blob([html], { type: "text/html" }),
+            "text/plain": new Blob([plainText], { type: "text/plain" })
+          })
+        ]);
+      } else {
+        await navigator.clipboard.writeText(plainText);
+      }
+
+      showToast("Copied for Epic");
+      logDev("Copied OpenEvidence result for Epic", {
+        htmlLength: html.length,
+        plainTextLength: plainText.length
+      });
+    } catch (error) {
+      logError("Copy for Epic failed", error.message);
+      showToast(`Copy for Epic failed: ${error.message}`);
+    }
+  }
+
+  function buildEpicHtml(section) {
+    const title = normalizeEpicText(section.querySelector("h2") && section.querySelector("h2").innerText);
+    const body = findEpicBodyRoot(section);
+    const parts = [
+      '<div style="font-family: Arial, sans-serif; font-size: 11pt; line-height: 1.25; color: #000000;">'
+    ];
+
+    if (title) {
+      parts.push(`<p style="margin: 0 0 8px 0;"><strong>${escapeHtml(title)}</strong></p>`);
+    }
+
+    Array.from(body.childNodes).forEach((node) => {
+      appendEpicHtmlNode(node, parts);
+    });
+
+    parts.push("</div>");
+    return parts.join("");
+  }
+
+  function appendEpicHtmlNode(node, parts) {
+    if (node.nodeType === Node.TEXT_NODE) {
+      const text = normalizeEpicText(node.textContent);
+      if (text && text !== "---") {
+        parts.push(`<div style="margin: 0 0 6px 0;">${escapeHtml(text)}</div>`);
+      }
+      return;
+    }
+
+    if (node.nodeType !== Node.ELEMENT_NODE || node.classList.contains("hide-on-print")) {
+      return;
+    }
+
+    const tagName = node.tagName.toLowerCase();
+
+    if (tagName === "hr") {
+      return;
+    }
+
+    if (tagName === "p") {
+      appendEpicParagraphHtml(node, parts);
+      return;
+    }
+
+    if (tagName === "ul" || tagName === "ol") {
+      appendEpicListHtml(node, parts, tagName);
+      return;
+    }
+
+    if (tagName === "table") {
+      parts.push(sanitizeEpicTableHtml(node));
+      return;
+    }
+
+    Array.from(node.childNodes).forEach((child) => {
+      appendEpicHtmlNode(child, parts);
+    });
+  }
+
+  function appendEpicParagraphHtml(paragraph, parts) {
+    const text = normalizeEpicText(paragraph.innerText);
+    if (!text || text === "---") {
+      return;
+    }
+
+    const strongOnly = paragraph.children.length === 1 &&
+      paragraph.firstElementChild.tagName.toLowerCase() === "strong" &&
+      normalizeEpicText(paragraph.firstElementChild.innerText) === text;
+    const margin = strongOnly ? "8px 0 4px 0" : "0 0 6px 0";
+    const weight = strongOnly ? "font-weight: 700;" : "";
+
+    parts.push(`<div style="margin: ${margin}; ${weight}">${sanitizeInlineEpicHtml(paragraph)}</div>`);
+  }
+
+  function appendEpicListHtml(list, parts, tagName) {
+    const items = Array.from(list.children)
+      .filter((child) => child.tagName && child.tagName.toLowerCase() === "li")
+      .map((item) => `<li style="margin: 0 0 3px 0;">${sanitizeInlineEpicHtml(item)}</li>`)
+      .join("");
+
+    if (items) {
+      parts.push(`<${tagName} style="margin: 0 0 6px 20px; padding: 0;">${items}</${tagName}>`);
+    }
+  }
+
+  function sanitizeInlineEpicHtml(element) {
+    const clone = element.cloneNode(true);
+    clone.querySelectorAll("script,style,button,.hide-on-print").forEach((node) => node.remove());
+    clone.querySelectorAll("*").forEach((node) => {
+      const tagName = node.tagName.toLowerCase();
+      Array.from(node.attributes).forEach((attribute) => node.removeAttribute(attribute.name));
+
+      if (!["strong", "b", "em", "i", "u", "br", "span", "sub", "sup"].includes(tagName)) {
+        node.replaceWith(...Array.from(node.childNodes));
+      }
+    });
+    return clone.innerHTML.trim();
+  }
+
+  function sanitizeEpicTableHtml(table) {
+    const clone = table.cloneNode(true);
+    clone.querySelectorAll("script,style,button,.hide-on-print").forEach((node) => node.remove());
+    clone.removeAttribute("class");
+    clone.removeAttribute("style");
+    clone.setAttribute("style", "border-collapse: collapse; margin: 0 0 8px 0; width: 100%;");
+    clone.querySelectorAll("th,td").forEach((cell) => {
+      cell.removeAttribute("class");
+      cell.removeAttribute("style");
+      cell.setAttribute("style", "border: 1px solid #999999; padding: 3px 5px; vertical-align: top;");
+    });
+    clone.querySelectorAll("th").forEach((cell) => {
+      cell.setAttribute("style", "border: 1px solid #999999; padding: 3px 5px; vertical-align: top; font-weight: 700;");
+    });
+    return clone.outerHTML;
+  }
+
+  function buildEpicPlainText(section) {
+    const lines = [];
+    const title = normalizeEpicText(section.querySelector("h2") && section.querySelector("h2").innerText);
+    const body = findEpicBodyRoot(section);
+
+    if (title) {
+      lines.push(title, "");
+    }
+
+    Array.from(body.childNodes).forEach((node) => {
+      appendEpicPlainTextNode(node, lines);
+    });
+
+    return compactEpicPlainTextLines(lines).join("\n").trim();
+  }
+
+  function appendEpicPlainTextNode(node, lines) {
+    if (node.nodeType === Node.TEXT_NODE) {
+      const text = normalizeEpicText(node.textContent);
+      if (text && text !== "---") {
+        lines.push(text);
+      }
+      return;
+    }
+
+    if (node.nodeType !== Node.ELEMENT_NODE || node.classList.contains("hide-on-print")) {
+      return;
+    }
+
+    const tagName = node.tagName.toLowerCase();
+    if (tagName === "hr") {
+      return;
+    }
+
+    if (tagName === "p") {
+      const text = normalizeEpicText(node.innerText);
+      if (text && text !== "---") {
+        lines.push(text);
+      }
+      return;
+    }
+
+    if (tagName === "li") {
+      const text = normalizeEpicText(node.innerText);
+      if (text) {
+        lines.push(`- ${text}`);
+      }
+      return;
+    }
+
+    if (tagName === "table") {
+      Array.from(node.querySelectorAll("tr")).forEach((row) => {
+        const cells = Array.from(row.querySelectorAll("th,td")).map((cell) => normalizeEpicText(cell.innerText));
+        if (cells.some(Boolean)) {
+          lines.push(cells.join(" | "));
+        }
+      });
+      return;
+    }
+
+    Array.from(node.childNodes).forEach((child) => {
+      appendEpicPlainTextNode(child, lines);
+    });
+  }
+
+  function compactEpicPlainTextLines(lines) {
+    const compacted = [];
+    lines.forEach((line) => {
+      const normalized = normalizeEpicText(line);
+      if (!normalized || normalized === "---") {
+        if (compacted.length && compacted[compacted.length - 1] !== "") {
+          compacted.push("");
+        }
+        return;
+      }
+      compacted.push(normalized);
+    });
+
+    while (compacted[0] === "") {
+      compacted.shift();
+    }
+    while (compacted[compacted.length - 1] === "") {
+      compacted.pop();
+    }
+
+    return compacted.filter((line, index) => line || compacted[index - 1]);
+  }
+
+  function normalizeEpicText(text) {
+    return String(text || "").replace(/\s+/g, " ").trim();
+  }
+
   function filterPrompts() {
     const query = pickerState.query.trim().toLowerCase();
     if (!query) {
@@ -578,6 +892,11 @@
 
   document.addEventListener("focusin", rememberEditable, true);
   document.addEventListener("contextmenu", rememberEditable, true);
+  enhanceEpicCopyButtons();
+  new MutationObserver(enhanceEpicCopyButtons).observe(document.documentElement, {
+    childList: true,
+    subtree: true
+  });
   logDev("Content script initialized", { url: window.location.href });
 
   chrome.runtime.onMessage.addListener((message) => {
